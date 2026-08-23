@@ -1,0 +1,168 @@
+name: Terraform CI/CD
+
+on:
+  push:
+    branches:
+      - feature/utkarsh
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+
+  # ==================================================
+  # Terraform Plan / Validation
+  # ==================================================
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: environment/dev
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+
+      # -----------------------------
+      # Checkout
+      # -----------------------------
+      -  name: Checkout Repository
+         uses: actions/checkout@v4
+         with:
+            fetch-depth: 0
+
+      # -----------------------------
+      # Setup Terraform
+      # -----------------------------
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      # -----------------------------
+      # Setup TFLint
+      # -----------------------------
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      # -----------------------------
+      # TFLint Init
+      # -----------------------------
+      - name: Initialize TFLint
+        run: tflint --init
+
+      # -----------------------------
+      # TFLint Scan
+      # -----------------------------
+      - name: Run TFLint
+        run: tflint
+
+      # -----------------------------
+      # Gitleaks
+      # -----------------------------
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # -----------------------------
+      # Azure Login
+      # -----------------------------
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # -----------------------------
+      # Terraform Init
+      # -----------------------------
+      - name: Terraform Init
+        run: terraform init
+
+      # -----------------------------
+      # Terraform Format
+      # -----------------------------
+      - name: Terraform Format Check
+        run: terraform fmt -check
+
+      # -----------------------------
+      # Terraform Validate
+      # -----------------------------
+      - name: Terraform Validate
+        run: terraform validate
+
+      # -----------------------------
+      # Terraform Plan
+      # -----------------------------
+      - name: Terraform Plan
+        run: terraform plan
+
+
+  # ==================================================
+  # Terraform Apply
+  # ==================================================
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+
+    # Apply ONLY after main branch push/merge
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    defaults:
+      run:
+        working-directory: environment/dev
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+
+      # -----------------------------
+      # Checkout
+      # -----------------------------
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # -----------------------------
+      # Setup Terraform
+      # -----------------------------
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      # -----------------------------
+      # Azure Login
+      # -----------------------------
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # -----------------------------
+      # Terraform Init
+      # -----------------------------
+      - name: Terraform Init
+        run: terraform init
+
+      # -----------------------------
+      # Terraform Apply
+      # -----------------------------
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
