@@ -3,7 +3,5 @@ rgs = {
     location = "west us"
   }
 
-   myrg2 = {
-    location = "west us"
-  }
+
 }
