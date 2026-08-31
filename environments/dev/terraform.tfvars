@@ -4,4 +4,7 @@ rgs = {
   }
 
 
+   myrg3 = {
+    location = "west us"
+  }
 }
